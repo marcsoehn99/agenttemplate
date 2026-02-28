@@ -76,7 +76,20 @@ Response (wenn fertig):
 
 ## Kategorien & Entitäten anpassen
 
-Kategorien und Entitäten werden pro Request dynamisch übergeben. `description` ist optional und gibt dem LLM mehr Kontext:
+Beide Felder sind **optional und unabhängig** voneinander. So kann man nur Kategorisierung, nur Extraktion oder beides machen:
+
+```json
+// Nur Kategorisierung
+{"text": "...", "categories": [{"name": "Bug"}, {"name": "Feature"}]}
+
+// Nur Entity-Extraktion
+{"text": "...", "entities": [{"name": "Person"}, {"name": "Location"}]}
+
+// Beides
+{"text": "...", "categories": [...], "entities": [...]}
+```
+
+`description` ist optional und gibt dem LLM mehr Kontext:
 
 ```json
 {"name": "Infrastructure", "description": "Bahnhöfe, Strecken, Gleise, Weichen"}
