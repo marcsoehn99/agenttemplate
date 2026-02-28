@@ -12,8 +12,8 @@ from app.worker import JobStore, JobStatus, CategoryInput, EntityInput, process_
 
 class JobRequest(BaseModel):
     text: str
-    categories: list[CategoryInput]
-    entities: list[EntityInput]
+    categories: list[CategoryInput] = []
+    entities: list[EntityInput] = []
 
 
 class JobResponse(BaseModel):

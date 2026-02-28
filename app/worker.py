@@ -51,8 +51,8 @@ class Job(BaseModel):
     job_id: str
     status: JobStatus
     text: str
-    categories: list[CategoryInput]
-    entities: list[EntityInput]
+    categories: list[CategoryInput] = []
+    entities: list[EntityInput] = []
     result: ClassificationResult | None = None
     error: str | None = None
 
@@ -64,7 +64,7 @@ class JobStore:
         self._jobs: dict[str, Job] = {}
         self._lock = Lock()
 
-    def create(self, text: str, categories: list[CategoryInput], entities: list[EntityInput]) -> str:
+    def create(self, text: str, categories: list[CategoryInput] = [], entities: list[EntityInput] = []) -> str:
         job_id = str(uuid.uuid4())
         job = Job(
             job_id=job_id,
@@ -121,18 +121,33 @@ def _format_items(items: list[CategoryInput] | list[EntityInput]) -> str:
 
 
 def _build_system_prompt(categories: list[CategoryInput], entities: list[EntityInput]) -> str:
-    return (
-        "You are a text classifier and entity extractor.\n\n"
-        "Classify the text into these categories:\n"
-        f"{_format_items(categories)}\n\n"
-        "For each matching category, provide a confidence score between 0 and 1.\n\n"
-        "Extract these entity types:\n"
-        f"{_format_items(entities)}\n\n"
-        "For each entity, provide the exact text, its type, "
-        "and the start/end character positions in the original text.\n\n"
+    parts = ["You are a text classifier and entity extractor.\n"]
+
+    if categories:
+        parts.append(
+            "Classify the text into these categories:\n"
+            f"{_format_items(categories)}\n\n"
+            "For each matching category, provide a confidence score between 0 and 1."
+        )
+    else:
+        parts.append("No categories requested. Return an empty categories list.")
+
+    if entities:
+        parts.append(
+            "Extract these entity types:\n"
+            f"{_format_items(entities)}\n\n"
+            "For each entity, provide the exact text, its type, "
+            "and the start/end character positions in the original text."
+        )
+    else:
+        parts.append("No entities requested. Return an empty entities list.")
+
+    parts.append(
         "Only return categories and entities that are actually present in the text.\n\n"
-        "Provide a brief reasoning explaining your classification and extraction decisions."
+        "Provide a brief reasoning explaining your decisions."
     )
+
+    return "\n\n".join(parts)
 
 
 def _call_llm(text: str, categories: list[CategoryInput], entities: list[EntityInput]) -> ClassificationResult:
