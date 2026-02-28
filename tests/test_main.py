@@ -10,8 +10,8 @@ def test_post_jobs_returns_job_id_and_pending():
     with patch("app.main.process_job"):
         response = client.post("/jobs", json={
             "text": "Hello world",
-            "categories": ["Greeting"],
-            "entities": ["Person"],
+            "categories": [{"name": "Greeting", "description": "Begrüßungen"}],
+            "entities": [{"name": "Person"}],
         })
 
     assert response.status_code == 200
@@ -24,8 +24,8 @@ def test_get_job_returns_status():
     with patch("app.main.process_job"):
         create = client.post("/jobs", json={
             "text": "Test",
-            "categories": ["A"],
-            "entities": ["B"],
+            "categories": [{"name": "A"}],
+            "entities": [{"name": "B"}],
         })
 
     job_id = create.json()["job_id"]

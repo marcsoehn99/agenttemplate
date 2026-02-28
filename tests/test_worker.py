@@ -1,12 +1,12 @@
-from app.worker import JobStore, JobStatus
+from app.worker import JobStore, JobStatus, CategoryInput, EntityInput
 
 
 def test_create_job_returns_id_and_pending_status():
     store = JobStore()
     job_id = store.create(
         text="Test text",
-        categories=["Bug", "Feature"],
-        entities=["Person", "Date"],
+        categories=[CategoryInput(name="Bug"), CategoryInput(name="Feature")],
+        entities=[EntityInput(name="Person"), EntityInput(name="Date")],
     )
 
     job = store.get(job_id)
@@ -32,8 +32,14 @@ def test_process_job_sets_status_to_completed():
     store = JobStore()
     job_id = store.create(
         text="Die Deutsche Bahn plant Bauarbeiten in Berlin.",
-        categories=["Infrastructure", "Finance"],
-        entities=["Organization", "Location"],
+        categories=[
+            CategoryInput(name="Infrastructure", description="Bahnhöfe, Strecken, Gleise"),
+            CategoryInput(name="Finance"),
+        ],
+        entities=[
+            EntityInput(name="Organization", description="Firmen und Behörden"),
+            EntityInput(name="Location"),
+        ],
     )
 
     fake_result = ClassificationResult(
@@ -55,7 +61,11 @@ def test_process_job_sets_status_to_completed():
 
 def test_process_job_sets_status_to_failed_on_error():
     store = JobStore()
-    job_id = store.create(text="Test", categories=["A"], entities=["B"])
+    job_id = store.create(
+        text="Test",
+        categories=[CategoryInput(name="A")],
+        entities=[EntityInput(name="B")],
+    )
 
     with patch("app.worker._call_llm", side_effect=Exception("API down")):
         process_job(store, job_id)

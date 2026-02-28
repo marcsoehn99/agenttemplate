@@ -5,15 +5,15 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-from app.worker import JobStore, JobStatus, process_job
+from app.worker import JobStore, JobStatus, CategoryInput, EntityInput, process_job
 
 
 # --- Request / Response Models ---
 
 class JobRequest(BaseModel):
     text: str
-    categories: list[str]
-    entities: list[str]
+    categories: list[CategoryInput]
+    entities: list[EntityInput]
 
 
 class JobResponse(BaseModel):

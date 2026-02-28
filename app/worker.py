@@ -13,6 +13,18 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
+# --- Input Models ---
+
+class CategoryInput(BaseModel):
+    name: str
+    description: str = ""
+
+
+class EntityInput(BaseModel):
+    name: str
+    description: str = ""
+
+
 # --- Result Models ---
 
 class CategoryResult(BaseModel):
@@ -38,8 +50,8 @@ class Job(BaseModel):
     job_id: str
     status: JobStatus
     text: str
-    categories: list[str]
-    entities: list[str]
+    categories: list[CategoryInput]
+    entities: list[EntityInput]
     result: ClassificationResult | None = None
     error: str | None = None
 
@@ -51,7 +63,7 @@ class JobStore:
         self._jobs: dict[str, Job] = {}
         self._lock = Lock()
 
-    def create(self, text: str, categories: list[str], entities: list[str]) -> str:
+    def create(self, text: str, categories: list[CategoryInput], entities: list[EntityInput]) -> str:
         job_id = str(uuid.uuid4())
         job = Job(
             job_id=job_id,
@@ -97,19 +109,31 @@ def _create_llm_client() -> instructor.Instructor:
     return instructor.from_openai(OpenAI())
 
 
-def _build_system_prompt(categories: list[str], entities: list[str]) -> str:
+def _format_items(items: list[CategoryInput] | list[EntityInput]) -> str:
+    lines = []
+    for item in items:
+        if item.description:
+            lines.append(f"- {item.name}: {item.description}")
+        else:
+            lines.append(f"- {item.name}")
+    return "\n".join(lines)
+
+
+def _build_system_prompt(categories: list[CategoryInput], entities: list[EntityInput]) -> str:
     return (
         "You are a text classifier and entity extractor.\n\n"
-        f"Classify the text into these categories: {', '.join(categories)}.\n"
+        "Classify the text into these categories:\n"
+        f"{_format_items(categories)}\n\n"
         "For each matching category, provide a confidence score between 0 and 1.\n\n"
-        f"Extract these entity types: {', '.join(entities)}.\n"
+        "Extract these entity types:\n"
+        f"{_format_items(entities)}\n\n"
         "For each entity, provide the exact text, its type, "
         "and the start/end character positions in the original text.\n\n"
         "Only return categories and entities that are actually present in the text."
     )
 
 
-def _call_llm(text: str, categories: list[str], entities: list[str]) -> ClassificationResult:
+def _call_llm(text: str, categories: list[CategoryInput], entities: list[EntityInput]) -> ClassificationResult:
     client = _create_llm_client()
     model = os.getenv("OPENAI_MODEL", "gpt-5.2")
 
