@@ -1,6 +1,9 @@
 import threading
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+load_dotenv()
 
 from app.worker import JobStore, JobStatus, process_job
 
