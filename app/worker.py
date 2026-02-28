@@ -84,3 +84,54 @@ class JobStore:
             if job_id in self._jobs:
                 self._jobs[job_id].status = JobStatus.FAILED
                 self._jobs[job_id].error = error
+
+
+# --- LLM Processing ---
+
+import os
+import instructor
+from openai import OpenAI
+
+
+def _create_llm_client() -> instructor.Instructor:
+    return instructor.from_openai(OpenAI())
+
+
+def _build_system_prompt(categories: list[str], entities: list[str]) -> str:
+    return (
+        "You are a text classifier and entity extractor.\n\n"
+        f"Classify the text into these categories: {', '.join(categories)}.\n"
+        "For each matching category, provide a confidence score between 0 and 1.\n\n"
+        f"Extract these entity types: {', '.join(entities)}.\n"
+        "For each entity, provide the exact text, its type, "
+        "and the start/end character positions in the original text.\n\n"
+        "Only return categories and entities that are actually present in the text."
+    )
+
+
+def _call_llm(text: str, categories: list[str], entities: list[str]) -> ClassificationResult:
+    client = _create_llm_client()
+    model = os.getenv("OPENAI_MODEL", "gpt-5.2")
+
+    return client.chat.completions.create(
+        model=model,
+        response_model=ClassificationResult,
+        messages=[
+            {"role": "system", "content": _build_system_prompt(categories, entities)},
+            {"role": "user", "content": text},
+        ],
+    )
+
+
+def process_job(store: JobStore, job_id: str) -> None:
+    job = store.get(job_id)
+    if job is None:
+        return
+
+    store.update_status(job_id, JobStatus.PROCESSING)
+
+    try:
+        result = _call_llm(job.text, job.categories, job.entities)
+        store.complete(job_id, result)
+    except Exception as e:
+        store.fail(job_id, str(e))
