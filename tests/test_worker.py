@@ -43,6 +43,7 @@ def test_process_job_sets_status_to_completed():
     )
 
     fake_result = ClassificationResult(
+        reasoning="Text mentions construction work on railway infrastructure.",
         categories=[CategoryResult(label="Infrastructure", confidence=0.95)],
         entities=[
             EntityResult(text="Deutsche Bahn", type="Organization", start=4, end=17),

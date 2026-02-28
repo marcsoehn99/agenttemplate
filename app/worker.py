@@ -40,6 +40,7 @@ class EntityResult(BaseModel):
 
 
 class ClassificationResult(BaseModel):
+    reasoning: str
     categories: list[CategoryResult]
     entities: list[EntityResult]
 
@@ -129,7 +130,8 @@ def _build_system_prompt(categories: list[CategoryInput], entities: list[EntityI
         f"{_format_items(entities)}\n\n"
         "For each entity, provide the exact text, its type, "
         "and the start/end character positions in the original text.\n\n"
-        "Only return categories and entities that are actually present in the text."
+        "Only return categories and entities that are actually present in the text.\n\n"
+        "Provide a brief reasoning explaining your classification and extraction decisions."
     )
 
 
