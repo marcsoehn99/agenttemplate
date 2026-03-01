@@ -1,4 +1,4 @@
-from app.worker import JobStore, JobStatus, CategoryInput, EntityInput
+from app.models import JobStore, JobStatus, CategoryInput, EntityInput
 
 
 def test_create_job_returns_id_and_pending_status():
@@ -25,7 +25,8 @@ def test_get_unknown_job_returns_none():
 # --- LLM Processing Tests ---
 
 from unittest.mock import patch, MagicMock
-from app.worker import process_job, ClassificationResult, CategoryResult, EntityResult
+from app.models import ClassificationResult, CategoryResult, EntityResult
+from app.worker import process_job
 
 
 def test_process_job_sets_status_to_completed():

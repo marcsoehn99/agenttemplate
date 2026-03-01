@@ -1,132 +1,22 @@
-import uuid
-from enum import Enum
-from threading import Lock
-from pydantic import BaseModel
-
-
-# --- Status ---
-
-class JobStatus(str, Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-# --- Input Models ---
-
-class CategoryInput(BaseModel):
-    name: str
-    description: str = ""
-
-
-class EntityInput(BaseModel):
-    name: str
-    description: str = ""
-
-
-# --- Result Models ---
-
-class CategoryResult(BaseModel):
-    label: str
-    confidence: float
-
-
-class EntityResult(BaseModel):
-    text: str
-    type: str
-    start: int
-    end: int
-
-
-class ClassificationResult(BaseModel):
-    reasoning: str
-    categories: list[CategoryResult]
-    entities: list[EntityResult]
-
-
-# --- Job ---
-
-class Job(BaseModel):
-    job_id: str
-    status: JobStatus
-    text: str
-    categories: list[CategoryInput] = []
-    entities: list[EntityInput] = []
-    result: ClassificationResult | None = None
-    error: str | None = None
-
-
-# --- Store ---
-
-class JobStore:
-    def __init__(self):
-        self._jobs: dict[str, Job] = {}
-        self._lock = Lock()
-
-    def create(self, text: str, categories: list[CategoryInput] = [], entities: list[EntityInput] = []) -> str:
-        job_id = str(uuid.uuid4())
-        job = Job(
-            job_id=job_id,
-            status=JobStatus.PENDING,
-            text=text,
-            categories=categories,
-            entities=entities,
-        )
-        with self._lock:
-            self._jobs[job_id] = job
-        return job_id
-
-    def get(self, job_id: str) -> Job | None:
-        with self._lock:
-            return self._jobs.get(job_id)
-
-    def update_status(self, job_id: str, status: JobStatus) -> None:
-        with self._lock:
-            if job_id in self._jobs:
-                self._jobs[job_id].status = status
-
-    def complete(self, job_id: str, result: ClassificationResult) -> None:
-        with self._lock:
-            if job_id in self._jobs:
-                self._jobs[job_id].status = JobStatus.COMPLETED
-                self._jobs[job_id].result = result
-
-    def fail(self, job_id: str, error: str) -> None:
-        with self._lock:
-            if job_id in self._jobs:
-                self._jobs[job_id].status = JobStatus.FAILED
-                self._jobs[job_id].error = error
-
-
-# --- LLM Processing ---
-
 import os
 import instructor
 from openai import OpenAI
-
-
-def _create_llm_client() -> instructor.Instructor:
-    return instructor.from_openai(OpenAI())
+from app.models import JobStore, JobStatus, CategoryInput, EntityInput, ClassificationResult
 
 
 def _format_items(items: list[CategoryInput] | list[EntityInput]) -> str:
-    lines = []
-    for item in items:
-        if item.description:
-            lines.append(f"- {item.name}: {item.description}")
-        else:
-            lines.append(f"- {item.name}")
-    return "\n".join(lines)
+    return "\n".join(
+        f"- {item.name}: {item.description}" if item.description else f"- {item.name}"
+        for item in items
+    )
 
 
 def _build_system_prompt(categories: list[CategoryInput], entities: list[EntityInput]) -> str:
-    parts = ["You are a text classifier and entity extractor.\n"]
+    parts = ["You are a text classifier and entity extractor."]
 
     if categories:
         parts.append(
-            "Classify the text into these categories:\n"
-            f"{_format_items(categories)}\n\n"
+            f"Classify the text into these categories:\n{_format_items(categories)}\n\n"
             "For each matching category, provide a confidence score between 0 and 1."
         )
     else:
@@ -134,8 +24,7 @@ def _build_system_prompt(categories: list[CategoryInput], entities: list[EntityI
 
     if entities:
         parts.append(
-            "Extract these entity types:\n"
-            f"{_format_items(entities)}\n\n"
+            f"Extract these entity types:\n{_format_items(entities)}\n\n"
             "For each entity, provide the exact text, its type, "
             "and the start/end character positions in the original text."
         )
@@ -146,16 +35,13 @@ def _build_system_prompt(categories: list[CategoryInput], entities: list[EntityI
         "Only return categories and entities that are actually present in the text.\n\n"
         "Provide a brief reasoning explaining your decisions."
     )
-
     return "\n\n".join(parts)
 
 
 def _call_llm(text: str, categories: list[CategoryInput], entities: list[EntityInput]) -> ClassificationResult:
-    client = _create_llm_client()
-    model = os.getenv("OPENAI_MODEL", "gpt-5.2")
-
+    client = instructor.from_openai(OpenAI())
     return client.chat.completions.create(
-        model=model,
+        model=os.getenv("OPENAI_MODEL", "gpt-5.2"),
         response_model=ClassificationResult,
         messages=[
             {"role": "system", "content": _build_system_prompt(categories, entities)},
@@ -170,7 +56,6 @@ def process_job(store: JobStore, job_id: str) -> None:
         return
 
     store.update_status(job_id, JobStatus.PROCESSING)
-
     try:
         result = _call_llm(job.text, job.categories, job.entities)
         store.complete(job_id, result)
