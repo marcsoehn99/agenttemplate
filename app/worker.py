@@ -1,6 +1,6 @@
 import os
 import instructor
-from openai import OpenAI
+from openai import AzureOpenAI
 from app.models import JobStore, JobStatus, CategoryInput, EntityInput, ClassificationResult
 
 
@@ -39,9 +39,13 @@ def _build_system_prompt(categories: list[CategoryInput], entities: list[EntityI
 
 
 def _call_llm(text: str, categories: list[CategoryInput], entities: list[EntityInput]) -> ClassificationResult:
-    client = instructor.from_openai(OpenAI())
+    client = instructor.from_openai(AzureOpenAI(
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+    ))
     return client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-5.2"),
+        model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
         response_model=ClassificationResult,
         messages=[
             {"role": "system", "content": _build_system_prompt(categories, entities)},
